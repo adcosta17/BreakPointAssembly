@@ -89,7 +89,7 @@ parser.add_argument('--input-fastq', required=True)
 parser.add_argument('--output-folder', required=True)
 parser.add_argument('--reference-genome', required=True)
 parser.add_argument('--cleanup', nargs='?', const="", default="")
-parser.add_argument('--racon', required=False, default="~/SimpsonLab/racon/build/bin/racon")
+parser.add_argument('--racon', required=False, default="racon")
 args = parser.parse_args()
 
 # First read in Sniffles TSV. For each translocation get break point locations and pull records from BAM
