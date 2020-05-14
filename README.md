@@ -31,7 +31,12 @@ python bp_assemble.py --sniffles-input <sniffles_translocation_calls.tsv> \
 
 ## Arguments:
 **--sniffles-input** A tsv of SV calls. 6 columns are needed: chromsome_A, start, end, chromsome_B, start, end
+
 **--input-bam** A bam file containing alignments of reads to the reference genome
+
 **--input-fastq** A fastq of the reads
+
 **--reference-genome** A reference genome fasta
+
 **--racon** [Optional] The path to racon. By default assumes racon is in the PATH
+
