@@ -14,6 +14,8 @@ The bp_assemble.py script uses samtools, minimap2 and racon to assemble and poli
 - mappy & minimap2
 - racon
 
+Installing the dependencies through a conda environment is recommended, however installation from source will work as well 
+
 ## Setup, Usage
 ```sh
 # Setup:
