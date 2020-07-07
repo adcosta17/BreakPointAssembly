@@ -9,9 +9,12 @@ The bp_assemble.py script uses samtools, minimap2 and racon to assemble and poli
 4. Align all reads at breakpoint positions to the scaffolds
 5. Polish the scaffold sequence using racon
 
+The script assumes that the reads are zipped and indexed by bgzip
+
 ## Dependencies
 - pysam & samtools
 - mappy & minimap2
+- bgzip
 - racon
 
 Installing the dependencies through a conda environment is recommended, however installation from source will work as well 
@@ -25,7 +28,7 @@ cd BreakPointAssembly
 # Usage: 
 python bp_assemble.py --sniffles-input <sniffles_translocation_calls.tsv> \
 --input-bam <input.bam> \
---input-fastq <input.fastq> \
+--input-fastq <input.fastq.gz> \
 --output-folder <path/to/output/folder> \
 --reference-genome <reference_genome.fa>
 
@@ -36,7 +39,7 @@ python bp_assemble.py --sniffles-input <sniffles_translocation_calls.tsv> \
 
 **--input-bam** A bam file containing alignments of reads to the reference genome
 
-**--input-fastq** A fastq of the reads
+**--input-fastq** A fastq of the reads, zipped and indexed by bgzip
 
 **--reference-genome** A reference genome fasta
 
