@@ -98,13 +98,14 @@ args = parser.parse_args()
 
 sniffles_regions = defaultdict(list)
 with open(args.sniffles_input,'r') as sn_in:
-    #count = 0
+    count = 0
     for line in sn_in:
         #if count == 0:
         #    count = 1
         #    continue
         line_arr = line.strip().split('\t')
-        sniffles_regions[int(line_arr[6])] = [line_arr[0], int(line_arr[1]), line_arr[3], int(line_arr[4])]
+        sniffles_regions[count] = [line_arr[0], int(line_arr[1]), line_arr[3], int(line_arr[4])]
+        count += 1
 
 sam_reader = pysam.AlignmentFile(args.input_bam)
 count = 0
