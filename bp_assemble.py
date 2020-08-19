@@ -110,6 +110,7 @@ with open(args.sniffles_input,'r') as sn_in:
 sam_reader = pysam.AlignmentFile(args.input_bam)
 count = 0
 for region in sniffles_regions:
+    print(region)
     # Go through each translocation and get list of reads that align to both sides
     # Split into 4 sections. Upstream 1, Downstream 1, Upstream 2, Downstream 2.
     # Hope to find at least 3 reads that align to one upstream and one downstream
@@ -221,7 +222,7 @@ for region in sniffles_regions:
             out_file = args.output_folder+"/target_sequence_aligned."+str(region)+"_"+comp+"_"+".paf"
             with open(out_file,'w') as out_paf:
                 for name, seq, qual in mp.fastx_read(tmp_seq_file): # read a fasta/q sequence
-                    for hit in a.map(seq):
+                    for hit in a_mp.map(seq):
                         out_paf.write(name+"\t"+str(len(seq))+"\t"+str(hit)+"\n")
             os.system("gzip "+out_file)
             os.system(args.racon+" "+tmp_seq_file+" "+out_file +".gz "+tmp_read_file+" > "+args.output_folder+"/corrected_"+str(region)+"_"+comp+"_"+".fa")
@@ -240,12 +241,12 @@ if count > 0:
                 header['SQ'].append({'LN': hit.ctg_len, 'SN': hit.ctg})
             a = pysam.AlignedSegment()
             a.query_name = name
-            a.query_sequence= seq
+            a.query_sequence= '*'
             a.flag = 99
             a.reference_id = get_id(header, hit.ctg)
             a.reference_start = hit.r_st
             a.mapping_quality = hit.mapq
-            a.cigarstring = hit.cigar_str
+            a.cigarstring = '*'
             records.append(a)
     with pysam.AlignmentFile(args.output_folder+"/corrected_all_tmp.bam", "wb", header=header) as outf:
         for alignment_rec in records:
