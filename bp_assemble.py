@@ -215,8 +215,8 @@ for region in sniffles_regions:
             if target_writen:
                 write_sequences_file(region, comp, sam_reader, ref1, ref2, max1, max2, args.input_fastq, args.output_folder)
         if target_writen:
-            a = mp.Aligner(tmp_read_file, preset='map-ont')
-            if not a: 
+            a_mp = mp.Aligner(tmp_read_file, preset='map-ont')
+            if not a_mp: 
                 raise Exception("ERROR: failed to load/build index")
             out_file = args.output_folder+"/target_sequence_aligned."+str(region)+"_"+comp+"_"+".paf"
             with open(out_file,'w') as out_paf:
@@ -248,8 +248,8 @@ if count > 0:
             a.cigarstring = hit.cigar_str
             records.append(a)
     with pysam.AlignmentFile(args.output_folder+"/corrected_all_tmp.bam", "wb", header=header) as outf:
-        for a in records:
-            outf.write(a)
+        for alignment_rec in records:
+            outf.write(alignment_rec)
     pysam.sort("-o", args.output_folder+"/corrected_all.bam", args.output_folder+"/corrected_all_tmp.bam")
     pysam.index(args.output_folder+"/corrected_all.bam")
 
