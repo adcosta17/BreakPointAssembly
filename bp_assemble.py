@@ -53,8 +53,7 @@ def get_reference_sets(up_ref1, up_ref2, down_ref1, down_ref2):
         ref2 = down_ref2
     return (ref1, ref2)
 
-def write_sequences_file(region, comp, sam_reader, ref1, ref2, max1, max2, input_fastq, output_folder):
-    tmp_seq_file = args.output_folder+"/sequences_"+str(region)+"_"+comp+"_"+".fa"
+def write_sequences_file(region, comp, sam_reader, ref1, ref2, max1, max2, input_fastq, output_folder, tmp_seq_file):
     reads_to_fetch = defaultdict(int)
     tmp_sam_reader = sam_reader.fetch(region=ref1[max1[1]][0]+":"+str(ref1[max1[1]][1])+"-"+str(ref1[max1[1]][2]))
     for record in tmp_sam_reader:
@@ -149,7 +148,7 @@ for region in sniffles_regions:
         target_writen = False
         if max1[1] == max2[1]:
             # Same read to use
-            write_sequences_file(region, comp, sam_reader, ref1, ref2, max1, max2, args.input_fastq, args.output_folder)
+            write_sequences_file(region, comp, sam_reader, ref1, ref2, max1, max2, args.input_fastq, args.output_folder, args.output_folder+"/sequences_"+str(region)+"_"+comp+"_"+".fa")
             tmp_read_file = args.output_folder+"/target_"+str(region)+"_"+comp+"_"+".fa"
             with open(tmp_read_file ,'w') as out_tmp:
                 with pysam.FastaFile(filename = args.input_fastq, filepath_index_compressed = args.input_fastq + ".index.gzi") as fq:
@@ -212,10 +211,10 @@ for region in sniffles_regions:
                             target_writen = True
             os.system("rm "+tmp_read_file)
             tmp_read_file = tmp_read_file_2
-            tmp_seq_file = args.output_folder+"/sequences_"+str(region)+"_"+comp+"_"+".fa"
             if target_writen:
-                write_sequences_file(region, comp, sam_reader, ref1, ref2, max1, max2, args.input_fastq, args.output_folder)
+                write_sequences_file(region, comp, sam_reader, ref1, ref2, max1, max2, args.input_fastq, args.output_folder, args.output_folder+"/sequences_"+str(region)+"_"+comp+"_"+".fa")
         if target_writen:
+            tmp_seq_file = args.output_folder+"/sequences_"+str(region)+"_"+comp+"_"+".fa"
             a_mp = mp.Aligner(tmp_read_file, preset='map-ont')
             if not a_mp: 
                 raise Exception("ERROR: failed to load/build index")
