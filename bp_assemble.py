@@ -88,6 +88,7 @@ parser.add_argument('--input-fastq', required=True)
 parser.add_argument('--output-folder', required=True)
 parser.add_argument('--reference-genome', required=True)
 parser.add_argument('--cleanup', nargs='?', const="", default="")
+parser.add_argument('--output-bam', nargs='?', const="", default="")
 parser.add_argument('--racon', required=False, default="racon")
 args = parser.parse_args()
 
@@ -108,6 +109,14 @@ with open(args.sniffles_input,'r') as sn_in:
 
 sam_reader = pysam.AlignmentFile(args.input_bam)
 count = 0
+
+# Check if output folder exists, if not create it
+if not os.path.exists(args.output_folder):
+    try:
+        os.mkdir(args.output_folder)
+    except OSError:
+        print ("Creation of the directory %s failed" % args.output_folder)
+
 for region in sniffles_regions:
     print(region)
     # Go through each translocation and get list of reads that align to both sides
@@ -229,29 +238,30 @@ for region in sniffles_regions:
 
 if count > 0:
     os.system("cat "+args.output_folder+"/corrected_* >> "+args.output_folder+"/combined_corrected.fa")
-    a_mp = mp.Aligner(args.reference_genome, preset='map-ont')
-    if not a_mp:
-        raise Exception("ERROR: failed to load/build index")
-    header = { 'HD': {'VN': '1.0'},'SQ': [] }
-    records = []
-    for name, seq, qual in mp.fastx_read(args.output_folder+"/combined_corrected.fa"): # read a fasta/q sequence
-        for hit in a_mp.map(seq):
-            if not in_header(header, hit.ctg):
-                header['SQ'].append({'LN': hit.ctg_len, 'SN': hit.ctg})
-            a = pysam.AlignedSegment()
-            a.query_name = name
-            a.query_sequence= '*'
-            a.flag = 99
-            a.reference_id = get_id(header, hit.ctg)
-            a.reference_start = hit.r_st
-            a.mapping_quality = hit.mapq
-            a.cigarstring = '*'
-            records.append(a)
-    with pysam.AlignmentFile(args.output_folder+"/corrected_all_tmp.bam", "wb", header=header) as outf:
-        for alignment_rec in records:
-            outf.write(alignment_rec)
-    pysam.sort("-o", args.output_folder+"/corrected_all.bam", args.output_folder+"/corrected_all_tmp.bam")
-    pysam.index(args.output_folder+"/corrected_all.bam")
+    if args.output_bam:
+        a_mp = mp.Aligner(args.reference_genome, preset='map-ont')
+        if not a_mp:
+            raise Exception("ERROR: failed to load/build index")
+        header = { 'HD': {'VN': '1.0'},'SQ': [] }
+        records = []
+        for name, seq, qual in mp.fastx_read(args.output_folder+"/combined_corrected.fa"): # read a fasta/q sequence
+            for hit in a_mp.map(seq):
+                if not in_header(header, hit.ctg):
+                    header['SQ'].append({'LN': hit.ctg_len, 'SN': hit.ctg})
+                a = pysam.AlignedSegment()
+                a.query_name = name
+                a.query_sequence= '*'
+                a.flag = 99
+                a.reference_id = get_id(header, hit.ctg)
+                a.reference_start = hit.r_st
+                a.mapping_quality = hit.mapq
+                a.cigarstring = '*'
+                records.append(a)
+        with pysam.AlignmentFile(args.output_folder+"/corrected_all_tmp.bam", "wb", header=header) as outf:
+            for alignment_rec in records:
+                outf.write(alignment_rec)
+        pysam.sort("-o", args.output_folder+"/corrected_all.bam", args.output_folder+"/corrected_all_tmp.bam")
+        pysam.index(args.output_folder+"/corrected_all.bam")
 
 if args.cleanup:
     os.system("rm "+args.output_folder+"/target_*")
