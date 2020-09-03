@@ -90,6 +90,8 @@ parser.add_argument('--reference-genome', required=True)
 parser.add_argument('--cleanup', nargs='?', const="", default="")
 parser.add_argument('--output-bam', nargs='?', const="", default="")
 parser.add_argument('--racon', required=False, default="racon")
+parser.add_argument('--bp-window', type=int, default=150)
+parser.add_argument('--small-window', nargs='?', const="", default="")
 args = parser.parse_args()
 
 # First read in Sniffles TSV. For each translocation get break point locations and pull records from BAM
@@ -238,13 +240,16 @@ for region in sniffles_regions:
 
 if count > 0:
     os.system("cat "+args.output_folder+"/corrected_* >> "+args.output_folder+"/combined_corrected.fa")
-    if args.output_bam:
+    if args.output_bam == '' or args.small_window == '':
         a_mp = mp.Aligner(args.reference_genome, preset='map-ont')
         if not a_mp:
             raise Exception("ERROR: failed to load/build index")
         header = { 'HD': {'VN': '1.0'},'SQ': [] }
         records = []
+        small_window_fa_records = []
         for name, seq, qual in mp.fastx_read(args.output_folder+"/combined_corrected.fa"): # read a fasta/q sequence
+            # Record the positions of the alignment here. Should get at least 2 positions for each hit
+            sequence_hits = []
             for hit in a_mp.map(seq):
                 if not in_header(header, hit.ctg):
                     header['SQ'].append({'LN': hit.ctg_len, 'SN': hit.ctg})
@@ -257,11 +262,31 @@ if count > 0:
                 a.mapping_quality = hit.mapq
                 a.cigarstring = '*'
                 records.append(a)
-        with pysam.AlignmentFile(args.output_folder+"/corrected_all_tmp.bam", "wb", header=header) as outf:
-            for alignment_rec in records:
-                outf.write(alignment_rec)
-        pysam.sort("-o", args.output_folder+"/corrected_all.bam", args.output_folder+"/corrected_all_tmp.bam")
-        pysam.index(args.output_folder+"/corrected_all.bam")
+                if hit.trans_strand == -1:
+                    sequence_hits.append([len(seq) - hit.q_en, len(seq) - hit.q_st])
+                else:
+                    sequence_hits.append([hit.q_st, hit.q_en])
+            if len(sequence_hits) != 2:
+                continue
+            if sequence_hits[0][0] < sequence_hits[1][0]:
+                # Break point starts at seq_hit[0][1] ends at seq_hit[1][0]
+                # Get average position for window
+                bp_avg_pos = int((sequence_hits[0][1] + sequence_hits[1][0])/2)
+                small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
+            else:
+                # Bp from [1][1] to [0][0]
+                bp_avg_pos = int((sequence_hits[1][1] + sequence_hits[0][0])/2)
+                small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
+        if args.output_bam == '':
+            with pysam.AlignmentFile(args.output_folder+"/corrected_all_tmp.bam", "wb", header=header) as outf:
+                for alignment_rec in records:
+                    outf.write(alignment_rec)
+            pysam.sort("-o", args.output_folder+"/corrected_all.bam", args.output_folder+"/corrected_all_tmp.bam")
+            pysam.index(args.output_folder+"/corrected_all.bam")
+        if args.small_window == '':
+            with open(args.output_folder+"/combined_corrected_small_window.fa", 'w') as out_small_window:
+                for record in small_window_fa_records:
+                    out_small_window.write(record)
 
 if args.cleanup:
     os.system("rm "+args.output_folder+"/target_*")
