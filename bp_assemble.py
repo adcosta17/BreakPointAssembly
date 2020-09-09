@@ -91,6 +91,7 @@ parser.add_argument('--cleanup', nargs='?', const="", default="")
 parser.add_argument('--output-bam', nargs='?', const="", default="")
 parser.add_argument('--racon', required=False, default="racon")
 parser.add_argument('--bp-window', type=int, default=150)
+parser.add_argument('--ref-window', type=int, default=150)
 parser.add_argument('--small-window', nargs='?', const="", default="")
 args = parser.parse_args()
 
@@ -164,7 +165,7 @@ for region in sniffles_regions:
             with open(tmp_read_file ,'w') as out_tmp:
                 with pysam.FastaFile(filename = args.input_fastq, filepath_index_compressed = args.input_fastq + ".index.gzi") as fq:
                     seq1 = fq.fetch(max1[1])
-                    out_tmp.write(">"+str(region)+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n"+seq1+"\n")
+                    out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n"+seq1+"\n")
                     target_writen = True
         else:
             # Find the overlap between the two sequences
@@ -205,19 +206,19 @@ for region in sniffles_regions:
                                 # Append from 0 to alignment start on read2 to read1's sequence
                                 if hit.strand < 0:
                                     # Should have the start of read2 aligned as well, take the end of it
-                                    out_tmp.write(">"+str(region)+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
+                                    out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
                                     out_tmp.write(reverse_complement(seq2[end2:length2])+seq1+"\n")
                                 else:
-                                    out_tmp.write(">"+str(region)+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
+                                    out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
                                     out_tmp.write(seq2[0:start2]+seq1+"\n")
                             else:
                                 # End of the read1 is aligned, append the end of read2 to read1's sequence
                                 if hit.strand < 0:
                                     # Should have the end of read2 aligned as well, take the start of it
-                                    out_tmp.write(">"+str(region)+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
+                                    out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
                                     out_tmp.write(seq1+reverse_complement(seq2[0:start2])+"\n")
                                 else:
-                                    out_tmp.write(">"+str(region)+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
+                                    out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
                                     out_tmp.write(seq1+seq2[end2:length2]+"\n")
                             target_writen = True
             os.system("rm "+tmp_read_file)
@@ -248,6 +249,9 @@ if count > 0:
         records = []
         small_window_fa_records = []
         for name, seq, qual in mp.fastx_read(args.output_folder+"/combined_corrected.fa"): # read a fasta/q sequence
+            regions = name.split('_')[0]
+            region_1 = regions.split('-')[0]
+            region_2 = regions.split('-')[1]
             # Record the positions of the alignment here. Should get at least 2 positions for each hit
             sequence_hits = []
             for hit in a_mp.map(seq):
@@ -263,20 +267,28 @@ if count > 0:
                 a.cigarstring = '*'
                 records.append(a)
                 if hit.trans_strand == -1:
-                    sequence_hits.append([len(seq) - hit.q_en, len(seq) - hit.q_st])
+                    sequence_hits.append([len(seq) - hit.q_en, len(seq) - hit.q_st, hit.ctg, hit.r_st, hit.r_en])
                 else:
-                    sequence_hits.append([hit.q_st, hit.q_en])
-            if len(sequence_hits) != 2:
-                continue
-            if sequence_hits[0][0] < sequence_hits[1][0]:
-                # Break point starts at seq_hit[0][1] ends at seq_hit[1][0]
-                # Get average position for window
-                bp_avg_pos = int((sequence_hits[0][1] + sequence_hits[1][0])/2)
-                small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
-            else:
-                # Bp from [1][1] to [0][0]
-                bp_avg_pos = int((sequence_hits[1][1] + sequence_hits[0][0])/2)
-                small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
+                    sequence_hits.append([hit.q_st, hit.q_en, hit.ctg, hit.r_st, hit.r_en])
+            hit1 = []
+            hit2 = []
+            for s in sequence_hits:
+                if s[2] == region_1.split(':')[0]:
+                    if abs(s[4] - int(region_1.split(':')[1])) < args.ref_window or abs(s[3] - int(region_1.split(':')[1])) < args.ref_window:
+                        hit1 = s
+                elif s[2] == region_2.split(':')[0]:
+                    if abs(s[4] - int(region_2.split(':')[1])) < args.ref_window or abs(s[3] - int(region_2.split(':')[1])) < args.ref_window:
+                        hit2 = s
+            if len(hit1) > 0 and len(hit2) > 0:
+                if hit1[0] < hit2[0]:
+                    # Break point starts at seq_hit[0][1] ends at seq_hit[1][0]
+                    # Get average position for window
+                    bp_avg_pos = int((hit1[1] + hit2[0])/2)
+                    small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
+                else:
+                    # Bp from [1][1] to [0][0]
+                    bp_avg_pos = int((hit2[1] + hit1[0])/2)
+                    small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
         if args.output_bam == '':
             with pysam.AlignmentFile(args.output_folder+"/corrected_all_tmp.bam", "wb", header=header) as outf:
                 for alignment_rec in records:
