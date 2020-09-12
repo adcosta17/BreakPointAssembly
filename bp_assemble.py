@@ -120,8 +120,9 @@ if not os.path.exists(args.output_folder):
     except OSError:
         print ("Creation of the directory %s failed" % args.output_folder)
 
+print("Generating Assemblies")
 for region in sniffles_regions:
-    print(region)
+    print(sniffles_regions[region][0]+":"+str(sniffles_regions[region][1])+" - "+sniffles_regions[region][2]+":"+str(sniffles_regions[region][3]))
     # Go through each translocation and get list of reads that align to both sides
     # Split into 4 sections. Upstream 1, Downstream 1, Upstream 2, Downstream 2.
     # Hope to find at least 3 reads that align to one upstream and one downstream
@@ -240,8 +241,10 @@ for region in sniffles_regions:
             count += 1
 
 if count > 0:
+    print("Generating Combined Output Fasta")
     os.system("cat "+args.output_folder+"/corrected_* >> "+args.output_folder+"/combined_corrected.fa")
     if args.output_bam == '' or args.small_window == '':
+        print("Aligning Targets back to reference")
         a_mp = mp.Aligner(args.reference_genome, preset='map-ont')
         if not a_mp:
             raise Exception("ERROR: failed to load/build index")
@@ -275,20 +278,39 @@ if count > 0:
             for s in sequence_hits:
                 if s[2] == region_1.split(':')[0]:
                     if abs(s[4] - int(region_1.split(':')[1])) < args.ref_window or abs(s[3] - int(region_1.split(':')[1])) < args.ref_window:
-                        hit1 = s
+                        if abs(s[4] - int(region_1.split(':')[1])) < args.ref_window:
+                            s.append(abs(s[4] - int(region_1.split(':')[1])))
+                        elif abs(s[3] - int(region_1.split(':')[1])) < args.ref_window:
+                            s.append(abs(s[3] - int(region_1.split(':')[1])))
+                        if hit1 == []:
+                            hit1 = s
+                        elif s[5] < hit1[5]:
+                            hit1 = s
                 elif s[2] == region_2.split(':')[0]:
                     if abs(s[4] - int(region_2.split(':')[1])) < args.ref_window or abs(s[3] - int(region_2.split(':')[1])) < args.ref_window:
-                        hit2 = s
+                        if abs(s[4] - int(region_2.split(':')[1])) < args.ref_window:
+                            s.append(abs(s[4] - int(region_2.split(':')[1])))
+                        elif abs(s[3] - int(region_2.split(':')[1])) < args.ref_window:
+                            s.append(abs(s[3] - int(region_2.split(':')[1])))
+                        if hit2 == []:
+                            hit2 = s
+                        elif s[5] < hit2[5]:
+                            hit2 = s
             if len(hit1) > 0 and len(hit2) > 0:
                 if hit1[0] < hit2[0]:
                     # Break point starts at seq_hit[0][1] ends at seq_hit[1][0]
                     # Get average position for window
-                    bp_avg_pos = int((hit1[1] + hit2[0])/2)
-                    small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
+                    if hit2[0]-hit1[1] < hit2[1]-hit1[0]:
+                        bp_avg_pos = int((hit1[1] + hit2[0])/2)
+                    else:
+                        bp_avg_pos = int((hit2[1] + hit1[0])/2)
                 else:
                     # Bp from [1][1] to [0][0]
-                    bp_avg_pos = int((hit2[1] + hit1[0])/2)
-                    small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
+                    if hit1[0]-hit2[1] < hit1[1]-hit2[0]:
+                        bp_avg_pos = int((hit2[1] + hit1[0])/2)
+                    else:
+                        bp_avg_pos = int((hit1[1] + hit2[0])/2)
+                small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
         if args.output_bam == '':
             with pysam.AlignmentFile(args.output_folder+"/corrected_all_tmp.bam", "wb", header=header) as outf:
                 for alignment_rec in records:
@@ -296,6 +318,7 @@ if count > 0:
             pysam.sort("-o", args.output_folder+"/corrected_all.bam", args.output_folder+"/corrected_all_tmp.bam")
             pysam.index(args.output_folder+"/corrected_all.bam")
         if args.small_window == '':
+            print("Generating Small Window Fasta")
             with open(args.output_folder+"/combined_corrected_small_window.fa", 'w') as out_small_window:
                 for record in small_window_fa_records:
                     out_small_window.write(record)
