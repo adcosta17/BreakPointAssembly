@@ -121,6 +121,7 @@ if not os.path.exists(args.output_folder):
         print ("Creation of the directory %s failed" % args.output_folder)
 
 print("Generating Assemblies")
+targets = []
 for region in sniffles_regions:
     print(sniffles_regions[region][0]+":"+str(sniffles_regions[region][1])+" - "+sniffles_regions[region][2]+":"+str(sniffles_regions[region][3]))
     # Go through each translocation and get list of reads that align to both sides
@@ -159,6 +160,12 @@ for region in sniffles_regions:
                 max2[1] = read
                 max2[0] = common_reads[comp][read][1]
         target_writen = False
+        found_target = False
+        for t in targets:
+            if max1[1] in t and max2[1] in t:
+                found_target = True
+        if found_target:
+            continue
         if max1[1] == max2[1]:
             # Same read to use
             write_sequences_file(region, comp, sam_reader, ref1, ref2, max1, max2, args.input_fastq, args.output_folder, args.output_folder+"/sequences_"+str(region)+"_"+comp+"_"+".fa")
@@ -167,6 +174,7 @@ for region in sniffles_regions:
                 with pysam.FastaFile(filename = args.input_fastq, filepath_index_compressed = args.input_fastq + ".index.gzi") as fq:
                     seq1 = fq.fetch(max1[1])
                     out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n"+seq1+"\n")
+                    targets.append(max1[1]+"___"+max2[1])
                     target_writen = True
         else:
             # Find the overlap between the two sequences
@@ -209,18 +217,22 @@ for region in sniffles_regions:
                                     # Should have the start of read2 aligned as well, take the end of it
                                     out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
                                     out_tmp.write(reverse_complement(seq2[end2:length2])+seq1+"\n")
+                                    targets.append(max1[1]+"___"+max2[1])
                                 else:
                                     out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
                                     out_tmp.write(seq2[0:start2]+seq1+"\n")
+                                    targets.append(max1[1]+"___"+max2[1])
                             else:
                                 # End of the read1 is aligned, append the end of read2 to read1's sequence
                                 if hit.strand < 0:
                                     # Should have the end of read2 aligned as well, take the start of it
                                     out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
                                     out_tmp.write(seq1+reverse_complement(seq2[0:start2])+"\n")
+                                    targets.append(max1[1]+"___"+max2[1])
                                 else:
                                     out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
                                     out_tmp.write(seq1+seq2[end2:length2]+"\n")
+                                    targets.append(max1[1]+"___"+max2[1])
                             target_writen = True
             os.system("rm "+tmp_read_file)
             tmp_read_file = tmp_read_file_2
