@@ -99,6 +99,7 @@ parser.add_argument('--cleanup', nargs='?', const="", default="")
 parser.add_argument('--output-bam', nargs='?', const="", default="")
 parser.add_argument('--racon', required=False, default="racon")
 parser.add_argument('--bp-window', type=int, default=150)
+parser.add_argument('--max-distance-from-expected', type=int, default=50)
 parser.add_argument('--ref-window', type=int, default=150)
 parser.add_argument('--max-reads', type=int, default=250)
 parser.add_argument('--small-window', nargs='?', const="", default="")
@@ -129,6 +130,7 @@ if not os.path.exists(args.output_folder):
     except OSError:
         print ("Creation of the directory %s failed" % args.output_folder)
 
+region_annotations = {}
 print("Generating Assemblies")
 targets = []
 for region in sniffles_regions:
@@ -155,6 +157,8 @@ for region in sniffles_regions:
     common_reads['Down1_Up2'] = get_common_reads(down_reads1, up_reads2)
     # Down1 Vs Down2
     common_reads['Down1_Down2'] = get_common_reads(down_reads1, down_reads2)
+    found_and_wrote_region = False
+    found_region = False
     for comp in common_reads:
         if len(common_reads[comp]) < 3:
             continue
@@ -186,6 +190,7 @@ for region in sniffles_regions:
                     out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n"+seq1+"\n")
                     targets.append(max1[1]+"___"+max2[1])
                     target_writen = True
+                    found_region = True
         else:
             # Find the overlap between the two sequences
             # Get the sequences and then overlap them
@@ -244,6 +249,7 @@ for region in sniffles_regions:
                                     out_tmp.write(seq1+seq2[end2:length2]+"\n")
                                     targets.append(max1[1]+"___"+max2[1])
                             target_writen = True
+                            found_region = True
             os.system("rm "+tmp_read_file)
             tmp_read_file = tmp_read_file_2
             if target_writen:
@@ -261,6 +267,14 @@ for region in sniffles_regions:
             os.system("gzip "+out_file)
             os.system(args.racon+" "+tmp_seq_file+" "+out_file +".gz "+tmp_read_file+" > "+args.output_folder+"/corrected_"+str(region)+"_"+comp+"_"+".fa")
             count += 1
+            found_and_wrote_region = True
+    sniffles_name = sniffles_regions[region][0]+":"+str(sniffles_regions[region][1])+" - "+sniffles_regions[region][2]+":"+str(sniffles_regions[region][3])
+    if found_and_wrote_region:
+        region_annotations[sniffles_name] = "\tfound_and_wrote_region\n"
+    elif found_region:
+        region_annotations[sniffles_name] = "\tfound_a_target_could_not_get_sequence\n"
+    else:
+        region_annotations[sniffles_name] = "\tno_breakpoint_found\n"
 
 if count > 0:
     print("Generating Combined Output Fasta")
@@ -319,6 +333,7 @@ if count > 0:
                         elif s[5] < hit2[5]:
                             hit2 = s
             if len(hit1) > 0 and len(hit2) > 0:
+                region_annotations[region_1 + " - " + region_2] = "\tfound_two_hits_at_right_region_wrong_distance\n"
                 if hit1[0] < hit2[0]:
                     # Break point starts at seq_hit[0][1] ends at seq_hit[1][0]
                     # Get average position for window
@@ -332,7 +347,16 @@ if count > 0:
                         bp_avg_pos = int((hit2[1] + hit1[0])/2)
                     else:
                         bp_avg_pos = int((hit1[1] + hit2[0])/2)
-                small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
+                # Check the hits here against the position they should align
+                hit1_match = False
+                hit2_match = False
+                if abs(int(region_1.split(':')[1]) - hit1[3]) < args.max_distance_from_expected or abs(int(region_1.split(':')[1]) - hit1[4]) < args.max_distance_from_expected:
+                    hit1_match = True
+                if abs(int(region_2.split(':')[1]) - hit2[3]) < args.max_distance_from_expected or abs(int(region_2.split(':')[1]) - hit2[4]) < args.max_distance_from_expected:
+                    hit2_match = True
+                if hit1_match and hit2_match:
+                    region_annotations[region_1 + " - " + region_2] = "\tPASS\n"
+                    small_window_fa_records.append(">"+name+"_"+str(bp_avg_pos-args.bp_window)+"_"+str(bp_avg_pos+args.bp_window)+"\n"+seq[bp_avg_pos-args.bp_window:bp_avg_pos+args.bp_window]+"\n")
         if args.output_bam == '':
             with pysam.AlignmentFile(args.output_folder+"/corrected_all_tmp.bam", "wb", header=header) as outf:
                 for alignment_rec in records:
@@ -344,6 +368,10 @@ if count > 0:
             with open(args.output_folder+"/combined_corrected_small_window.fa", 'w') as out_small_window:
                 for record in small_window_fa_records:
                     out_small_window.write(record)
+
+with open(args.output_folder+"/region_annotations.txt",'w') as sn_out:
+    for name in region_annotations:
+        sn_out.write(name+region_annotations[name])
 
 if args.cleanup:
     os.system("rm "+args.output_folder+"/target_*")
