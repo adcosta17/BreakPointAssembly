@@ -224,29 +224,42 @@ for region in sniffles_regions:
                             length2 = len(seq)
                             start2 = hit.q_st
                             end2 = hit.q_en
+                            # Figure out which read is target and which is query
+                            if name == max1[1]:
+                                read1 = seq2
+                                read2 = seq1
+                            else:
+                                read1 = seq1
+                                read2 = seq2
                             # Assuming one read is not contained in the other
+                            #print(str(hit.ctg)+"\t"+str(hit.ctg_len)+"\t"+str(hit.r_st)+"\t"+str(hit.r_en)+"\t"+name+"\t"+str(len(seq))+"\t"+str(hit.q_st)+"\t"+str(hit.q_en))
+                            #print(hit.strand)
                             if start1 < (length1 - end1):
                                 # Start of read1 is aligned, take the start of the other read
                                 # Append from 0 to alignment start on read2 to read1's sequence
                                 if hit.strand < 0:
+                                    #print("case1\t"+max1[1]+"\t"+str(len(seq1))+"\t"+max2[1]+str(len(seq2)))
                                     # Should have the start of read2 aligned as well, take the end of it
                                     out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
-                                    out_tmp.write(reverse_complement(seq2[end2:length2])+seq1+"\n")
+                                    out_tmp.write(reverse_complement(read2[end2:length2])+read1+"\n")
                                     targets.append(max1[1]+"___"+max2[1])
                                 else:
+                                    #print("case2\t"+max1[1]+"\t"+str(len(seq1))+"\t"+max2[1]+str(len(seq2)))
                                     out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
-                                    out_tmp.write(seq2[0:start2]+seq1+"\n")
+                                    out_tmp.write(read2[0:start2]+read1+"\n")
                                     targets.append(max1[1]+"___"+max2[1])
                             else:
                                 # End of the read1 is aligned, append the end of read2 to read1's sequence
                                 if hit.strand < 0:
+                                    #print("case3\t"+max1[1]+"\t"+str(len(seq1))+"\t"+max2[1]+str(len(seq2)))
                                     # Should have the end of read2 aligned as well, take the start of it
                                     out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
-                                    out_tmp.write(seq1+reverse_complement(seq2[0:start2])+"\n")
+                                    out_tmp.write(read1+reverse_complement(read2[0:start2])+"\n")
                                     targets.append(max1[1]+"___"+max2[1])
                                 else:
+                                    #print("case4\t"+max1[1]+"\t"+str(len(seq1))+"\t"+max2[1]+str(len(seq2)))
                                     out_tmp.write(">"+str(sniffles_regions[region][0])+":"+str(sniffles_regions[region][1])+"-"+str(sniffles_regions[region][2])+":"+str(sniffles_regions[region][3])+"_"+comp+"___"+max1[1]+"___"+max2[1]+"\n")
-                                    out_tmp.write(seq1+seq2[end2:length2]+"\n")
+                                    out_tmp.write(read1+read2[end2:length2]+"\n")
                                     targets.append(max1[1]+"___"+max2[1])
                             target_writen = True
                             found_region = True
